@@ -20,7 +20,7 @@ import java.net.URL
 import java.net.URLEncoder
 import javax.net.ssl.HttpsURLConnection
 import kotlin.collections.Map.Entry
-
+import com.google.gson.Gson
 
 class MainActivity2 : Activity() {
 
@@ -106,6 +106,13 @@ class MainActivity2 : Activity() {
         return false
     }
 
+    data class GpsLocation(val lat: Double, val lng: Double)
+    data class ClswData(
+        val clsw: Boolean,
+        val sensor: String,
+        val value: GpsLocation
+    )
+
     private fun startServiceWithPermissions() {
         val haveAccessToLocation = ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         val haveBackgroundLocationAccess = Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q
@@ -124,8 +131,22 @@ class MainActivity2 : Activity() {
                     if(loc != null) {
                         Log.d("LOCATION", loc.toString());
 
-                        Log.d("CONFIG", "MainActivity2 l.127: Changer le nom de domaine de la requête.");
-                        // performPostCall("http://10.0.0.22:3000/test", loc);
+                        Thread {
+                            val data =
+                                ClswData(true, "gps", GpsLocation(loc.latitude, loc.longitude))
+                            val json = Gson().toJson(data)
+                            Log.d("JSON", json)
+                            val url = URL("https://domino.zdimension.fr/web/clsw/data.php")
+                            val connection = url.openConnection() as HttpURLConnection
+                            connection.requestMethod = "POST"
+                            connection.setRequestProperty("Content-Type", "application/json; utf-8")
+                            connection.doOutput = true
+                            val os = connection.outputStream
+                            val input: ByteArray = json.toByteArray()
+                            os.write(input, 0, input.size)
+                            val responseCode = connection.responseCode
+                            Log.d("RESPONSE", responseCode.toString())
+                        }.start()
                     }
                     super.onLocationResult(p0)
                 }
@@ -138,41 +159,4 @@ class MainActivity2 : Activity() {
         }
     }
 
-    fun performPostCall(
-        requestURL: String?,
-        location: Location
-    ): String? {
-        val url: URL
-        var response: String? = ""
-        try {
-            url = URL(requestURL)
-            val conn: HttpURLConnection = url.openConnection() as HttpURLConnection
-            conn.setReadTimeout(15000)
-            conn.setConnectTimeout(15000)
-            conn.setRequestMethod("GET")
-            conn.setDoInput(true)
-            conn.setDoOutput(true)
-            val os: OutputStream = conn.getOutputStream()
-            val writer = BufferedWriter(
-                OutputStreamWriter(os, "UTF-8")
-            )
-            writer.write("{ \"latitude\": \"${location.latitude}\", \"longitude\": \"${location.longitude}\" }")
-            writer.flush()
-            writer.close()
-            os.close()
-            val responseCode: Int = conn.getResponseCode()
-            if (responseCode == HttpsURLConnection.HTTP_OK) {
-                var line: String?
-                val br = BufferedReader(InputStreamReader(conn.getInputStream()))
-                while (br.readLine().also { line = it } != null) {
-                    response += line
-                }
-            } else {
-                response = ""
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return response
-    }
 }
