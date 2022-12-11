@@ -4,11 +4,8 @@ import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
-import android.os.IInterface
-import android.os.Parcel
 import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.fitness.Fitness
 import com.google.android.gms.fitness.FitnessOptions
 import com.google.android.gms.fitness.SensorsClient
@@ -17,11 +14,10 @@ import com.google.android.gms.fitness.data.DataType
 import com.google.android.gms.fitness.request.DataSourcesRequest
 import com.google.android.gms.fitness.request.OnDataPointListener
 import com.google.android.gms.fitness.request.SensorRequest
-import java.io.FileDescriptor
 import java.util.concurrent.TimeUnit
 
 
-class SensorsService : Service() {
+class FitnessSensorService : Service() {
     private val binder: SensorsServiceBinder = SensorsServiceBinder();
     private lateinit var sensors: SensorsClient;
     private var listener: OnDataPointListener? = null;
@@ -45,8 +41,8 @@ class SensorsService : Service() {
 
 
     inner class SensorsServiceBinder : Binder() {
-        fun getService(): SensorsService {
-            return this@SensorsService;
+        fun getService(): FitnessSensorService {
+            return this@FitnessSensorService;
         }
     }
 
