@@ -29,4 +29,4 @@ la création de dashboards et de règles automatiques très extensibles, ce qui 
 
 Le résultat :
 
-![img_2.png](img_2.png)
+![img_3.png](img_3.png)
