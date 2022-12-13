@@ -30,3 +30,21 @@ la création de dashboards et de règles automatiques très extensibles, ce qui 
 Le résultat :
 
 ![img_3.png](img_3.png)
+
+## Installation
+
+Le backend à proprement parler consiste en les deux fichiers PHP du dossier backend. Il faut modifier db.php pour entrer les coordonnées du serveur PostgreSQL.
+
+L'application se trouve dans le dossier ProjetCLW ; il faut modifier dans GpsSensorService.kt ligne 77 l'URL publique du backend une fois celui-ci installé. 
+
+Une fois le backend installé, la visualisation se fait avec Grafana, installable via APT ou Docker, configuré sur une data source PostgreSQL.
+
+Exemple de requête :
+
+```sql
+select date, value::float from data where sensor='bpm'
+```
+
+Résultat :
+
+![image](https://user-images.githubusercontent.com/4533568/207410071-b7dff283-2754-4978-ad50-3d2fbd9b91d4.png)
