@@ -5,8 +5,12 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -14,12 +18,8 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import com.example.projetclw.databinding.ActivityMain2Binding
 import com.google.android.gms.location.*
-import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
-import javax.net.ssl.HttpsURLConnection
-import kotlin.collections.Map.Entry
 import com.google.gson.Gson
 
 class MainActivity2 : Activity() {
@@ -36,7 +36,12 @@ class MainActivity2 : Activity() {
         binding = ActivityMain2Binding.inflate(layoutInflater)
         setContentView(binding.root)
 
+
+        // prevent display from sleeping
+        binding.root.keepScreenOn = true
+
         binding.startService.setOnClickListener { _ -> start() }
+
     }
 
 
@@ -70,6 +75,31 @@ class MainActivity2 : Activity() {
             }
         }
 
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) != PackageManager.PERMISSION_GRANTED) {
+            if(ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.BODY_SENSORS)) {
+                AlertDialog.Builder(this)
+                    .setTitle("Sensor permission")
+                    .setMessage("Access to sensors is required to log the position.")
+                    .setPositiveButton("OK") { _, _ -> requestSensorPermission() }
+                    .create().show();
+            } else {
+                requestSensorPermission();
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WAKE_LOCK) != PackageManager.PERMISSION_GRANTED) {
+                if(ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WAKE_LOCK)) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Wake lock permission")
+                        .setMessage("Access to wake lock is required to log the position.")
+                        .setPositiveButton("OK") { _, _ -> requestWakeLockPermission() }
+                        .create().show();
+                } else {
+                    requestWakeLockPermission();
+                }
+            }
+        }
     }
 
     private fun requestFinePositionPermission() {
@@ -86,6 +116,14 @@ class MainActivity2 : Activity() {
         } else {
             requestFinePositionPermission();
         }
+    }
+
+    private fun requestSensorPermission() {
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BODY_SENSORS), LOCATION_PERMISSION_REQUEST);
+    }
+
+    private fun requestWakeLockPermission() {
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WAKE_LOCK), LOCATION_PERMISSION_REQUEST);
     }
 
     override fun onRequestPermissionsResult(
@@ -107,10 +145,10 @@ class MainActivity2 : Activity() {
     }
 
     data class GpsLocation(val lat: Double, val lng: Double)
-    data class ClswData(
-        val clsw: Boolean,
+    data class ClswData<T>(
         val sensor: String,
-        val value: GpsLocation
+        val value: T,
+        val clsw: Boolean = true
     )
 
     private fun startServiceWithPermissions() {
@@ -119,6 +157,10 @@ class MainActivity2 : Activity() {
                 ||  ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
 
         if(haveAccessToLocation && haveBackgroundLocationAccess && !isMyServiceRunning(GpsSensorService::class.java)) {
+            // create a background service that fetches location every 5 second
+            val service = Intent(this, GpsSensorService::class.java)
+            startService(service)
+            /*
             // Start the service
             val request = LocationRequest.create()
                 .setInterval(5000)
@@ -131,22 +173,9 @@ class MainActivity2 : Activity() {
                     if(loc != null) {
                         Log.d("LOCATION", loc.toString());
 
-                        Thread {
-                            val data =
-                                ClswData(true, "gps", GpsLocation(loc.latitude, loc.longitude))
-                            val json = Gson().toJson(data)
-                            Log.d("JSON", json)
-                            val url = URL("https://domino.zdimension.fr/web/clsw/data.php")
-                            val connection = url.openConnection() as HttpURLConnection
-                            connection.requestMethod = "POST"
-                            connection.setRequestProperty("Content-Type", "application/json; utf-8")
-                            connection.doOutput = true
-                            val os = connection.outputStream
-                            val input: ByteArray = json.toByteArray()
-                            os.write(input, 0, input.size)
-                            val responseCode = connection.responseCode
-                            Log.d("RESPONSE", responseCode.toString())
-                        }.start()
+                        val data =
+                            ClswData("gps", GpsLocation(loc.latitude, loc.longitude))
+                        sendSensorData(data)
                     }
                     super.onLocationResult(p0)
                 }
@@ -155,8 +184,73 @@ class MainActivity2 : Activity() {
             val client = LocationServices.getFusedLocationProviderClient(applicationContext);
             client.lastLocation.addOnSuccessListener { res -> Log.d("LOCATION", res?.toString() ?: "NULL"); };
             client.getCurrentLocation(CurrentLocationRequest.Builder().build(), null).addOnSuccessListener { res -> Log.d("LOCATION", res?.toString() ?: "NULL") }
-            client.requestLocationUpdates(request, callback, Looper.getMainLooper());
+            client.requestLocationUpdates(request, callback, Looper.getMainLooper());*/
         }
+/*
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val temp = sensorManager.getDefaultSensor(Sensor.TYPE_AMBIENT_TEMPERATURE)
+        // every 5 second
+        sensorManager.registerListener(object : SensorEventListener {
+            override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+                // TODO
+            }
+
+            override fun onSensorChanged(p0: SensorEvent?) {
+                if(p0 != null) {
+                    val data = ClswData("temperature", p0.values[0])
+                    sendSensorData(data)
+                }
+            }
+        }, temp, 30 * 1000 * 1000)
+
+        val pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
+        sensorManager.registerListener(object : SensorEventListener {
+            override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+                // TODO
+            }
+
+            override fun onSensorChanged(p0: SensorEvent?) {
+                if(p0 != null) {
+                    val data = ClswData("pressure", p0.values[0])
+                    sendSensorData(data)
+                }
+            }
+        }, pressure, 30 * 1000 * 1000)
+
+        val bpm = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE)
+        sensorManager.registerListener(object : SensorEventListener {
+            override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+                // TODO
+            }
+
+            override fun onSensorChanged(p0: SensorEvent?) {
+                if(p0 != null) {
+                    val data = ClswData("bpm", p0.values[0])
+                    sendSensorData(data)
+                }
+            }
+        }, bpm, 1000 * 1000)*/
+    }
+
+    private fun <T> sendSensorData(data: ClswData<T>) {
+        Thread {
+            val json = Gson().toJson(data)
+            Log.d("JSON", json)
+            val url = URL("https://domino.zdimension.fr/web/clsw/data.php")
+            try {
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json; utf-8")
+                connection.doOutput = true
+                val os = connection.outputStream
+                val input: ByteArray = json.toByteArray()
+                os.write(input, 0, input.size)
+                val responseCode = connection.responseCode
+                Log.d("RESPONSE", responseCode.toString())
+            } catch (e: Exception) {
+                Log.e("ERROR", e.toString())
+            }
+        }.start()
     }
 
 }
